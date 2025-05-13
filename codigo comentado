@@ -1,0 +1,112 @@
+Practica 4
+# === IMPORTACIÓN DE LIBRERÍAS NECESARIAS ===
+import pandas as pd                      # Para manejar archivos CSV y estructuras de datos
+import numpy as np                       # Para cálculos numéricos y manejo de arrays
+import matplotlib.pyplot as plt          # Para generar gráficos
+from scipy.signal import butter, filtfilt  # Para aplicar filtros (pasa bajas y pasa bandas)
+from scipy.fft import fft, fftfreq       # Para hacer Transformada Rápida de Fourier (FFT)
+
+# === DEFINICIÓN DE FUNCIONES ===
+
+# Promediado móvil con una ventana de N muestras
+def moving_average(data, window=3):
+    return data.rolling(window=window, center=True).mean()
+
+# Filtro pasa bajas
+def lowpass_filter(data, cutoff=0.1, fs=1/5):
+    nyq = 0.5 * fs                             # Frecuencia de Nyquist
+    normal_cutoff = cutoff / nyq              # Normalización de frecuencia
+    b, a = butter(4, normal_cutoff, btype='low')  # Diseño del filtro Butterworth de orden 4
+    return filtfilt(b, a, data)               # Filtrado directo e inverso (para evitar fase)
+
+# Filtro pasa bandas
+def bandpass_filter(data, lowcut, highcut, fs=1/5):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    b, a = butter(4, [low, high], btype='band')  # Filtro de banda
+    return filtfilt(b, a, data)
+
+# Función para graficar el espectro FFT
+def plot_fft(signal, fs=1/5, label=''):
+    N = len(signal)
+    yf = fft(signal)                       # FFT
+    xf = fftfreq(N, 1/fs)[:N//2]           # Frecuencias positivas
+    plt.plot(xf, 2.0/N * np.abs(yf[:N//2]), label=label)
+
+# === CARGA DE LOS DATOS CSV ===
+
+# Leer los archivos CSV (asegúrate que estén en la misma carpeta que este script)
+temp = pd.read_csv('temperatura.csv')     # Sensor de temperatura
+hum = pd.read_csv('humedad.csv')          # Sensor de humedad
+wind = pd.read_csv('viento.csv')          # Sensor de viento
+
+# Generar eje de tiempo suponiendo muestreo cada 5 segundos (0.2 muestras por segundo)
+time = np.arange(len(temp)) * 5
+
+# === GRAFICAR SEÑALES ORIGINALES ===
+plt.figure()
+plt.plot(time, temp['valor'], label='Temperatura')
+plt.plot(time, hum['valor'], label='Humedad')
+plt.plot(time, wind['valor'], label='Viento')
+plt.title('Señales Originales de Sensores')
+plt.xlabel('Tiempo (s)')
+plt.ylabel('Valor')
+plt.legend()
+plt.grid()
+plt.show()
+
+# === APLICAR PROMEDIADO MÓVIL ===
+temp_avg = moving_average(temp['valor'])
+hum_avg = moving_average(hum['valor'])
+wind_avg = moving_average(wind['valor'])
+
+plt.figure()
+plt.plot(time, temp['valor'], label='Original')
+plt.plot(time, temp_avg, label='Promediada')
+plt.title('Temperatura - Promediado Móvil')
+plt.xlabel('Tiempo (s)')
+plt.ylabel('Valor')
+plt.legend()
+plt.grid()
+plt.show()
+
+# === APLICAR FILTRO PASA BAJAS ===
+temp_lp = lowpass_filter(temp['valor'])
+hum_lp = lowpass_filter(hum['valor'])
+wind_lp = lowpass_filter(wind['valor'])
+
+plt.figure()
+plt.plot(time, temp['valor'], label='Original')
+plt.plot(time, temp_lp, label='Filtrada (Pasa Bajas)')
+plt.title('Temperatura - Filtro Pasa Bajas')
+plt.xlabel('Tiempo (s)')
+plt.ylabel('Valor')
+plt.legend()
+plt.grid()
+plt.show()
+
+# === APLICAR FILTRO PASA BANDAS ===
+temp_bp = bandpass_filter(temp['valor'], 0.01, 0.08)
+
+plt.figure()
+plt.plot(time, temp['valor'], label='Original')
+plt.plot(time, temp_bp, label='Filtrada (Pasa Bandas)')
+plt.title('Temperatura - Filtro Pasa Bandas')
+plt.xlabel('Tiempo (s)')
+plt.ylabel('Valor')
+plt.legend()
+plt.grid()
+plt.show()
+
+# === ANÁLISIS DE FRECUENCIA (FFT) ===
+plt.figure()
+plot_fft(temp['valor'], label='Original')
+plot_fft(temp_lp, label='Pasa Bajas')
+plot_fft(temp_bp, label='Pasa Bandas')
+plt.title('Análisis de Frecuencia (FFT) - Temperatura')
+plt.xlabel('Frecuencia (Hz)')
+plt.ylabel('Amplitud')
+plt.legend()
+plt.grid()
+plt.show()
